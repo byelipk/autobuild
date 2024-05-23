@@ -1,6 +1,11 @@
 defmodule Autobuild do
   def ping do
-    IO.puts "pong"
+    IO.puts "Pong!"
+  end
+
+  def echo(message) do
+    IO.puts "You sent: #{message}"
+    IO.puts(read_file(message, "testing"))
   end
 
   def read_files(paths_and_tags) do
