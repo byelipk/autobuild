@@ -1,4 +1,8 @@
 defmodule Autobuild do
+  def ping do
+    IO.puts "pong"
+  end
+
   def read_files(paths_and_tags) do
     Enum.map(paths_and_tags, fn {abs_path, tag} ->
       read_file(abs_path, tag)
