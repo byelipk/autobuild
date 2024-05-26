@@ -35,7 +35,7 @@ defmodule Autobuild.ParserTest do
            ]
   end
 
-  test "it can dedupe imports" do
+  test "it can dedupe and sort imports" do
     lines = [
       "from foo import pee\n",
       "import baz\n",
@@ -47,7 +47,7 @@ defmodule Autobuild.ParserTest do
     results = Autobuild.Parser.dedupe_imports(lines)
 
     assert results == [
-             "from foo import (pee, poop, drink)\n",
+             "from foo import (drink, pee, poop)\n",
              "import bar\n",
              "import baz\n"
            ]
@@ -128,5 +128,37 @@ defmodule Autobuild.ParserTest do
               ]}
 
     File.rm!("example.py")
+  end
+
+  test "it can pull all tags out of source lines" do
+    lines = [
+      "import os\n",
+      "import sys\n",
+      "import time\n",
+      "\n",
+      "# ==========\n",
+      "# File: example.py\n",
+      "# Tag: testing1\n",
+      "# ==========\n",
+      "\n",
+      "def hello():\n",
+      "    return \"World\"\n",
+      "\n",
+      "# ==========\n",
+      "# File: example2.py\n",
+      "# Tag: testing2\n",
+      "# ==========\n",
+      "\n",
+      "def goodbye():\n",
+      "    return \"Goodbye\"\n",
+      "\n"
+    ]
+
+    results = Autobuild.Parser.pull_tags(lines)
+
+    assert results == [
+             "testing1",
+             "testing2"
+           ]
   end
 end

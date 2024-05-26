@@ -17,7 +17,7 @@ defmodule Autobuild.FilewriterTest do
           "    return \"World\"\n",
           "\n"
         ],
-        "testing1"
+        "testing1.py"
       },
       {
         :ok,
@@ -33,7 +33,7 @@ defmodule Autobuild.FilewriterTest do
           "    return \"Goodbye\"\n",
           "\n"
         ],
-        "testing2"
+        "testing2.py"
       }
     ]
 

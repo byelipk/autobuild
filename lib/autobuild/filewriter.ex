@@ -4,6 +4,7 @@ defmodule Autobuild.Filewriter do
     combined_source =
       Enum.reduce(statements, [], fn
         {_, filepath, _imports, source_code, tag}, acc ->
+          tag = String.replace(tag, ".py", "")
           preamble = [
             "\n\n",
             "# ==========\n",

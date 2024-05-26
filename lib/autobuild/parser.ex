@@ -1,6 +1,14 @@
 defmodule Autobuild.Parser do
+  def pull_tags(source_lines) do
+    source_lines
+    |> Enum.filter(&String.starts_with?(&1, "# Tag:"))
+    |> Enum.flat_map(&String.split(&1, "# Tag:"))
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(fn line -> String.length(line) == 0 end)
+  end
+
   def purge_imports(import_lines, source_lines) do
-    tags = source_tags(source_lines)
+    tags = pull_tags(source_lines)
 
     if Enum.empty?(tags) do
       import_lines
@@ -53,7 +61,11 @@ defmodule Autobuild.Parser do
           ["import " <> mod <> "\n" | acc]
 
         _ ->
-          ["from " <> mod <> " import (" <> Enum.join(imports, ", ") <> ")\n" | acc]
+          sorted = Enum.sort(imports) |> Enum.join(", ")
+          [
+            "from " <> mod <> " import (" <> sorted <> ")\n"
+            | acc
+          ]
       end
     end)
     |> Enum.sort()
@@ -210,13 +222,5 @@ defmodule Autobuild.Parser do
       |> Enum.reverse()
 
     hd(current_import) <> "\s(" <> Enum.join(all_elements, ", ") <> ")"
-  end
-
-  defp source_tags(source_lines) do
-    source_lines
-    |> Enum.filter(&String.starts_with?(&1, "# Tag:"))
-    |> Enum.flat_map(&String.split(&1, "# Tag:"))
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(fn line -> String.length(line) == 0 end)
   end
 end

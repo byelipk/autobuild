@@ -4,6 +4,11 @@ defmodule AutobuildTest do
   setup_all do
     # Create file
     source1 = """
+    import time
+    import time
+    import time
+    import os
+    import os
     import os
 
     def hello():
@@ -12,6 +17,10 @@ defmodule AutobuildTest do
     """
 
     source2 = """
+    import os
+    import os
+    import os
+    import os
     import time
 
     def goodbye():
