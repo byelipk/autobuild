@@ -1,9 +1,65 @@
 defmodule Autobuild.Parser do
+  def purge_imports(import_lines, source_lines) do
+    tags = source_tags(source_lines)
+
+    if Enum.empty?(tags) do
+      import_lines
+    end
+
+    Enum.filter(import_lines, fn line ->
+      trimmed = String.trim(line)
+
+      case Enum.any?(tags, fn tag -> String.contains?(trimmed, tag) end) do
+        true ->
+          false
+
+        false ->
+          true
+      end
+    end)
+  end
+
   @doc """
-  Flattens single or multiline python import statements into a single line 
-  for easier processing.
+  Dedupe imports in a list of imports
   """
-  def flatten(lines_of_code) do
+  def dedupe_imports(lines_of_code) do
+    Enum.reduce(lines_of_code, %{}, fn line, acc ->
+      trimmed = String.trim(line)
+
+      case trimmed do
+        <<f, r, o, m, _, rest::binary>> when <<f, r, o, m>> == "from" ->
+          [mod, _ | imports] = String.split(rest, " ")
+          import_list = String.split(hd(imports), ",") |> Enum.map(&String.trim(&1))
+
+          case Map.get(acc, mod) do
+            nil ->
+              Map.put(acc, mod, import_list)
+
+            _ ->
+              Map.update(acc, mod, import_list, fn imports ->
+                imports ++ import_list
+              end)
+          end
+
+        <<i, m, p, o, r, t, _, rest::binary>> when <<i, m, p, o, r, t>> == "import" ->
+          mod = String.split(rest, ",") |> Enum.map(&String.trim(&1))
+
+          Map.put(acc, hd(mod), [])
+      end
+    end)
+    |> Enum.reduce([], fn {mod, imports}, acc ->
+      case imports do
+        [] ->
+          ["import " <> mod <> "\n" | acc]
+
+        _ ->
+          ["from " <> mod <> " import (" <> Enum.join(imports, ", ") <> ")\n" | acc]
+      end
+    end)
+    |> Enum.sort()
+  end
+
+  def hoist_imports(lines_of_code) do
     output =
       Enum.reduce(
         lines_of_code,
@@ -71,12 +127,10 @@ defmodule Autobuild.Parser do
               end
 
             _ ->
-              IO.puts("ERROR: Line not matched")
-              IO.inspect(lines_of_code)
-              IO.inspect(acc)
-              raise "Should not have gotten here. " +
-                      "There is probably a bug in the python source code " +
-                      "or some import statement grammar we are not parsing correctly."
+              raise RuntimeError,
+                message:
+                  "Should not have gotten here. " <>
+                    "There is probably a bug in the python source code or some import statement grammar we are not parsing correctly."
           end
         end
       )
@@ -89,45 +143,54 @@ defmodule Autobuild.Parser do
     |> Enum.map(fn line -> line <> "\n" end)
   end
 
-  def parse(stream) do
-    Enum.reduce(stream, {:none, [], []}, fn line, acc ->
-      {status, imports, source_code} = acc
+  def readlines(stream) do
+    output =
+      Enum.reduce(stream, {:none, [], []}, fn line, acc ->
+        {status, imports, source_code} = acc
 
-      case line do
-        <<i, m, p, o, r, t, rest::binary>>
-        when <<i, m, p, o, r, t>> == "import" ->
-          cond do
-            String.trim(rest) |> String.ends_with?("(") ->
-              {:multiline_import, ["import" <> rest | imports], source_code}
+        case line do
+          <<i, m, p, o, r, t, rest::binary>>
+          when <<i, m, p, o, r, t>> == "import" ->
+            cond do
+              String.trim(rest) |> String.ends_with?("(") ->
+                {:multiline_import, ["import" <> rest | imports], source_code}
 
-            String.ends_with?(rest, "\n") ->
-              {:none, ["import" <> rest | imports], source_code}
-          end
+              String.ends_with?(rest, "\n") ->
+                {:none, ["import" <> rest | imports], source_code}
+            end
 
-        <<f, r, o, m, rest::binary>>
-        when <<f, r, o, m>> == "from" ->
-          cond do
-            String.trim(rest) |> String.ends_with?("(") ->
-              {:multiline_import, ["from" <> rest | imports], source_code}
+          <<f, r, o, m, rest::binary>>
+          when <<f, r, o, m>> == "from" ->
+            cond do
+              String.trim(rest) |> String.ends_with?("(") ->
+                {:multiline_import, ["from" <> rest | imports], source_code}
 
-            String.ends_with?(rest, "\n") ->
-              {:none, ["from" <> rest | imports], source_code}
-          end
+              String.ends_with?(rest, "\n") ->
+                {:none, ["from" <> rest | imports], source_code}
+            end
 
-        _ ->
-          cond do
-            status == :multiline_import ->
-              if String.trim(line) |> String.ends_with?(")") do
-                {:none, [line | imports], source_code}
-              else
-                {:multiline_import, [line | imports], source_code}
-              end
+          _ ->
+            cond do
+              status == :multiline_import ->
+                if String.trim(line) |> String.ends_with?(")") do
+                  {:none, [line | imports], source_code}
+                else
+                  {:multiline_import, [line | imports], source_code}
+                end
 
-            true ->
-              {:none, imports, [line | source_code]}
-          end
-      end
-    end)
+              true ->
+                {:none, imports, [line | source_code]}
+            end
+        end
+      end)
+
+    case output do
+      {:none, imports, source_code} ->
+        {:ok, Enum.reverse(imports), Enum.reverse(source_code)}
+
+      _ ->
+        raise "Oh shit"
+    end
   end
 
   defp has_opening_paren?(str), do: String.contains?(str, "(")
@@ -147,5 +210,13 @@ defmodule Autobuild.Parser do
       |> Enum.reverse()
 
     hd(current_import) <> "\s(" <> Enum.join(all_elements, ", ") <> ")"
+  end
+
+  defp source_tags(source_lines) do
+    source_lines
+    |> Enum.filter(&String.starts_with?(&1, "# Tag:"))
+    |> Enum.flat_map(&String.split(&1, "# Tag:"))
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(fn line -> String.length(line) == 0 end)
   end
 end

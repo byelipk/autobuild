@@ -1,5 +1,5 @@
 defmodule Autobuild.Filereader do
-  def collect(abs_path, tag) do
+  def read_file(abs_path, tag) do
     safe_to_proceed =
       if File.exists?(abs_path) do
         {:ok, abs_path}
@@ -11,19 +11,19 @@ defmodule Autobuild.Filereader do
       {:ok, abs_path} ->
         contents =
           File.stream!(abs_path, :line)
-          |> parse_stream()
+          |> readlines()
 
-        imports = elem(contents, 1) |> Enum.reverse()
-        source_code = elem(contents, 2) |> Enum.reverse()
+        {_, imports, source_code} = contents
 
-        {:ok, tag, imports, source_code}
+        {:ok, abs_path, imports, source_code, tag}
 
       {:error, reason} ->
-        IO.puts(reason)
+        IO.puts(:stderr, reason)
+        {:error, reason}
     end
   end
 
-  defp parse_stream(stream) do
-    Autobuild.Parser.parse(stream)
+  defp readlines(stream) do
+    Autobuild.Parser.readlines(stream)
   end
 end
