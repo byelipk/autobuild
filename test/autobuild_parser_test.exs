@@ -40,16 +40,46 @@ defmodule Autobuild.ParserTest do
       "from foo import pee\n",
       "import baz\n",
       "from foo import poop\n",
-      "from foo import drink\n",
+      "from foo import (drink, drugs)\n",
       "import bar\n"
     ]
 
     results = Autobuild.Parser.dedupe_imports(lines)
 
     assert results == [
-             "from foo import (drink, pee, poop)\n",
+             "from foo import (drink, drugs, pee, poop)\n",
              "import bar\n",
              "import baz\n"
+           ]
+  end
+
+  test "it can pull tags from source lines" do
+    lines = [
+      "import os\n",
+      "import sys\n",
+      "import time\n",
+      "\n",
+      "# ==========\n",
+      "# File: example.py\n",
+      "# Tag: testing1\n",
+      "# ==========\n",
+      "\n",
+      "def hello():\n",
+      "    return \"World\"\n",
+      "\n",
+      "# ==========\n",
+      "# File: example2.py\n# Tag: testing2\n# ==========\n",
+      "\n",
+      "def goodbye():\n",
+      "    return \"Goodbye\"\n",
+      "\n"
+    ]
+
+    results = Autobuild.Parser.pull_tags(lines)
+
+    assert results == [
+             "testing1",
+             "testing2"
            ]
   end
 

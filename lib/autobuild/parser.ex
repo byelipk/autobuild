@@ -1,9 +1,12 @@
 defmodule Autobuild.Parser do
   def pull_tags(source_lines) do
     source_lines
-    |> Enum.filter(&String.starts_with?(&1, "# Tag:"))
-    |> Enum.flat_map(&String.split(&1, "# Tag:"))
-    |> Enum.map(&String.trim/1)
+    |> Enum.filter(&String.contains?(&1, "# Tag: "))
+    |> Enum.map(fn line ->
+      [_ | rest] = String.split(line, "# Tag: ")
+
+      hd(String.split(hd(rest), "\n")) |> String.trim()
+    end)
     |> Enum.reject(fn line -> String.length(line) == 0 end)
   end
 
@@ -14,17 +17,11 @@ defmodule Autobuild.Parser do
       import_lines
     end
 
-    Enum.filter(import_lines, fn line ->
-      trimmed = String.trim(line)
+    cleaned =
+      import_lines
+      |> Enum.reject(fn trimmed -> String.contains?(trimmed, tags) end)
 
-      case Enum.any?(tags, fn tag -> String.contains?(trimmed, tag) end) do
-        true ->
-          false
-
-        false ->
-          true
-      end
-    end)
+    cleaned
   end
 
   @doc """
@@ -36,8 +33,13 @@ defmodule Autobuild.Parser do
 
       case trimmed do
         <<f, r, o, m, _, rest::binary>> when <<f, r, o, m>> == "from" ->
-          [mod, _ | imports] = String.split(rest, " ")
-          import_list = String.split(hd(imports), ",") |> Enum.map(&String.trim(&1))
+          str =
+            String.replace(rest, "(", "")
+            |> String.replace(")", "")
+            |> String.replace(",", "")
+            |> String.trim()
+
+          [mod, _ | import_list] = String.split(str, " ")
 
           case Map.get(acc, mod) do
             nil ->
@@ -61,7 +63,11 @@ defmodule Autobuild.Parser do
           ["import " <> mod <> "\n" | acc]
 
         _ ->
-          sorted = Enum.sort(imports) |> Enum.join(", ")
+          sorted =
+            Enum.sort(imports)
+            |> Enum.filter(fn i -> i != "" end)
+            |> Enum.join(", ")
+
           [
             "from " <> mod <> " import (" <> sorted <> ")\n"
             | acc
