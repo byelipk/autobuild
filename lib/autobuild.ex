@@ -45,8 +45,6 @@ defmodule Autobuild do
   end
 
   def sanity_check(dist_dir) do
-    IO.puts("Sanity check...")
-
     output =
       File.stream!(dist_dir, :line)
       |> Autobuild.Parser.sanity_check()
