@@ -200,7 +200,7 @@ defmodule Autobuild.ParserTest do
       "\n",
       "    # @sanity-check \"This is a message\"\n",
       "    obj = {\n",
-      "        \"foo\": \"bar\",\n",
+      "        \"foo\": \"bar\", # This is a comment\n",
       "        \"baz\": \"qux\"\n",
       "        \"bool\": True\n",
       "        \"int\": 123\n",

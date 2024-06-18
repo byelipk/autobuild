@@ -372,8 +372,18 @@ defmodule Autobuild.Parser do
 
   defp tokenize_sanity_check_value(s) when is_binary(s) do
     s
+    |> strip_comments()
     |> String.replace("\"", "")
     |> String.replace(",", "")
     |> String.trim()
+  end
+
+  defp strip_comments(s) do
+    if String.contains?(s, "#") do
+      [source_code, _comments] = String.split(s, "#")
+      source_code
+    else
+      s
+    end
   end
 end
