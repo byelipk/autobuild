@@ -1,7 +1,7 @@
 defmodule Autobuild.ParserTest do
   use ExUnit.Case
 
-  test "it can hoist_imports a list of imports correctly" do
+  test "it can hoist imports a list of imports correctly" do
     lines = [
       "import os\n",
       "import sys\n",
@@ -189,6 +189,42 @@ defmodule Autobuild.ParserTest do
     assert results == [
              "testing1",
              "testing2"
+           ]
+  end
+
+  @tag :focus
+  test "it can parse objects with sanity-check tag" do
+    lines = [
+      "boop = True\n",
+      "print(\"Hello world\")\n",
+      "\n",
+      "    # @sanity-check \"This is a message\"\n",
+      "    obj = {\n",
+      "        \"foo\": \"bar\",\n",
+      "        \"baz\": \"qux\"\n",
+      "        \"bool\": True\n",
+      "        \"int\": 123\n",
+      "    }\n",
+      "\n"
+    ]
+
+    output = Autobuild.Parser.sanity_check(lines)
+
+    assert length(elem(output, 0)) == 1
+
+    assert elem(output, 0) == [
+             %{
+               tag: "sanity-check",
+               message: "This is a message",
+               line_start: 4,
+               line_end: 9,
+               data: %{
+                 "foo" => "bar",
+                 "baz" => "qux",
+                 "bool" => "True",
+                 "int" => "123"
+               }
+             }
            ]
   end
 end

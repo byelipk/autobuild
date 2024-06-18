@@ -1,4 +1,109 @@
 defmodule Autobuild.Parser do
+  def sanity_check([]), do: []
+
+  def sanity_check(source_lines) do
+    initial = {
+      # All checks
+      [],
+      # Current check
+      nil,
+      # Current line number
+      1
+    }
+
+    sanity_check_label = "@sanity-check"
+
+    source_lines
+    |> Enum.reduce(initial, fn line, acc ->
+      {checks, current_check, current_line_number} = acc
+
+      trimmed = String.trim(line)
+
+      should_parse =
+        String.contains?(trimmed, sanity_check_label) ||
+          current_check != nil
+
+      if should_parse do
+        case current_check do
+          nil ->
+            case parse_sanity_check_header(trimmed) do
+              %{tag: tag, message: message} ->
+                {
+                  checks,
+                  %{
+                    tag: tag,
+                    message: message,
+                    line_start: current_line_number,
+                    line_end: nil,
+                    data: %{}
+                  },
+                  current_line_number + 1
+                }
+
+              %{} ->
+                raise "Error parsing header on line: #{current_line_number}"
+            end
+
+          _ ->
+            case trimmed do
+              # Opening curly
+              "{" ->
+                {
+                  checks,
+                  %{current_check | data: %{}},
+                  current_line_number + 1
+                }
+
+              # Closing curly
+              "}" ->
+                {
+                  checks ++ [current_check],
+                  nil,
+                  current_line_number + 1
+                }
+
+              # Empty line
+              "" ->
+                {
+                  checks,
+                  current_check,
+                  current_line_number + 1
+                }
+
+              _ ->
+                case parse_sanity_check_body(trimmed) do
+                  %{key: k, value: v} ->
+                    data = Map.get(current_check, :data, %{})
+
+                    {
+                      checks,
+                      %{
+                        current_check
+                        | line_end: current_line_number,
+                          data: Map.put(data, k, v)
+                      },
+                      current_line_number + 1
+                    }
+
+                  %{} ->
+                    {
+                      checks,
+                      %{
+                        current_check
+                        | line_end: current_line_number
+                      },
+                      current_line_number + 1
+                    }
+                end
+            end
+        end
+      else
+        # dbg(current_check)
+        {checks, current_check, current_line_number + 1}
+      end
+    end)
+  end
+
   def pull_tags(source_lines) do
     source_lines
     |> Enum.filter(&String.contains?(&1, "# Tag: "))
@@ -228,5 +333,47 @@ defmodule Autobuild.Parser do
       |> Enum.reverse()
 
     hd(current_import) <> "\s(" <> Enum.join(all_elements, ", ") <> ")"
+  end
+
+  defp parse_sanity_check_header(line) when is_binary(line) do
+    [hashtag, tag | message] = String.split(line)
+
+    if "#" == hashtag and String.starts_with?(tag, "@") do
+      %{
+        tag: String.replace(tag, "@", ""),
+        message:
+          Enum.join(message, " ")
+          |> String.replace("\"", "")
+          |> String.trim()
+      }
+    else
+      %{}
+    end
+  end
+
+  defp parse_sanity_check_body(line) when is_binary(line) do
+    if String.contains?(line, "=") and String.ends_with?(line, "{") do
+      %{}
+    else
+      [key, value] = String.split(line, ":")
+
+      %{
+        key: tokenize_sanity_check_key(key),
+        value: tokenize_sanity_check_value(value)
+      }
+    end
+  end
+
+  defp tokenize_sanity_check_key(s) when is_binary(s) do
+    s
+    |> String.replace("\"", "")
+    |> String.trim()
+  end
+
+  defp tokenize_sanity_check_value(s) when is_binary(s) do
+    s
+    |> String.replace("\"", "")
+    |> String.replace(",", "")
+    |> String.trim()
   end
 end

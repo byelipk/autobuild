@@ -3,6 +3,7 @@ defmodule Autobuild do
     IO.puts("Command received.")
     IO.puts("Source directory: #{src_dir}")
     IO.puts("Distribution directory: #{dist_dir}")
+    IO.puts("")
     IO.puts("Building...")
 
     all_files_in_src_dir =
@@ -15,7 +16,11 @@ defmodule Autobuild do
       end)
       |> Enum.sort()
 
+    IO.puts("Concatenating files...")
+
     combine_files(all_files_in_src_dir, dist_dir)
+
+    sanity_check(dist_dir)
 
     IO.puts("Build complete.")
   end
@@ -37,5 +42,21 @@ defmodule Autobuild do
 
   def write_file(statements, write_to) do
     Autobuild.Filewriter.write_file(statements, write_to)
+  end
+
+  def sanity_check(dist_dir) do
+    IO.puts("Sanity check...")
+
+    output =
+      File.stream!(dist_dir, :line)
+      |> Autobuild.Parser.sanity_check()
+
+    { checks, _, _ } = output
+
+    Enum.each(checks, fn check -> 
+      message = Map.get(check, :message)
+      IO.puts("Sanity check: #{message}")
+      IO.inspect(Map.get(check, :data))
+    end)
   end
 end

@@ -9,6 +9,8 @@ defmodule Autobuild.Filereader do
 
     case safe_to_proceed do
       {:ok, abs_path} ->
+        IO.puts(:stdio, "Reading file: " <> abs_path)
+
         contents =
           File.stream!(abs_path, :line)
           |> readlines()
