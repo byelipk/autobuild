@@ -192,7 +192,6 @@ defmodule Autobuild.ParserTest do
            ]
   end
 
-  @tag :focus
   test "it can parse objects with sanity-check tag" do
     lines = [
       "boop = True\n",
