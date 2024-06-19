@@ -1,13 +1,6 @@
 defmodule Autobuild.Filereader do
   def read_file(abs_path, tag) do
-    safe_to_proceed =
-      if File.exists?(abs_path) do
-        {:ok, abs_path}
-      else
-        {:error, "File does not exist: " <> abs_path}
-      end
-
-    case safe_to_proceed do
+    case run_safety_check(abs_path) do
       {:ok, abs_path} ->
         IO.puts(:stdio, "Reading file: " <> abs_path)
 
@@ -27,5 +20,19 @@ defmodule Autobuild.Filereader do
 
   defp readlines(stream) do
     Autobuild.Parser.readlines(stream)
+  end
+
+  defp run_safety_check(abs_path) do
+    if File.exists?(abs_path) do
+      basename = Path.basename(abs_path)
+
+      if String.starts_with?(basename, "_") do
+        {:error, "File is protected: " <> abs_path}
+      else
+        {:ok, abs_path}
+      end
+    else
+      {:error, "File does not exist: " <> abs_path}
+    end
   end
 end
